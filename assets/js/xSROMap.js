@@ -226,6 +226,7 @@ var xSROMap = function(){
 		mappingLayers['32793'] = new SRLayer(imgHost+'d/{z}/RN_ARABIA_FIELD_02_BOSS_{x}x{y}.jpg', {
 			attribution: '<a href="#">Kalia\'s Hideout</a>'
 		});
+		// 32794 - Sealed Dungeon of Vicious Shadows
 		// Secret Tombs
 		mappingLayers['32795'] = new SRLayer(imgHost+'d/{z}/ln_secret_tomb_top_{x}x{y}.jpg', {
 			attribution: '<a href="#">Upper Secret Tomb</a>'
