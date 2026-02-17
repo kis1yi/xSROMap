@@ -497,3 +497,31 @@ body {
 	left:0;
 	right:0;
 }
+/* NavMesh toggle button */
+#navmesh-toggle { border-radius: 0 !important; }
+.navmesh-active #navmesh-toggle { background-color: #d0d0d0; }
+.navmesh-actions {
+	display: none;
+	position: absolute;
+	top: 0;
+	right: 26px;
+	white-space: nowrap;
+}
+.navmesh-active .navmesh-actions { display: block; }
+a.navmesh-action,
+a.navmesh-action:hover {
+	display: inline-block;
+	padding: 0 10px;
+	width: auto;
+	height: 26px;
+	line-height: 26px;
+	background-color: #31353D;
+	color: #fff;
+	text-decoration: none;
+	border-bottom: 1px solid #00beff;
+	user-select: none;
+	cursor: pointer;
+}
+a.navmesh-action:hover {
+	background-color: #777;
+}

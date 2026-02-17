@@ -63,6 +63,11 @@ var xSROMap = function(){
 		'location':{}
 	};
 	var mappingShapes = {};
+	// navmesh overlay
+	var navmeshLayer = null;
+	var navmeshVisible = false;
+	var navmeshWorldLayer = null;
+	var navmeshDungeonLayers = {};
 	// xSRO Map conversions
 	var CoordMapToSRO = function(latlng){
 		// world layer
@@ -142,6 +147,26 @@ var xSROMap = function(){
 
 		map.addLayer(mapLayer);
 		map.setView([91,135], 8);
+
+		// Navmesh overlay layers (PNG tiles)
+		var SRNavMeshLayer = L.TileLayer.extend({
+			getTileUrl: function(tile) {
+				tile.y = -tile.y;
+				return L.TileLayer.prototype.getTileUrl.call(this, tile);
+			},
+			createTile: function(coords, done) {
+				var tile = L.TileLayer.prototype.createTile.call(this, coords, done);
+				tile.onerror = function() {
+					tile.style.display = 'none';
+					done(null, tile);
+				};
+				return tile;
+			}
+		});
+		navmeshWorldLayer = new SRNavMeshLayer(imgHost+'navmesh/{z}/{x}x{y}.png', {
+			attribution: 'NavMesh',
+			opacity: 0.7
+		});
 
 		// Area layers
 		// cave donwhang
@@ -234,6 +259,73 @@ var xSROMap = function(){
 		mappingLayers['32796'] = new SRLayer(imgHost+'d/{z}/ln_secret_tomb_bottom_{x}x{y}.jpg', {
 			attribution: '<a href="#">Lower Secret Tomb</a>'
 		});
+
+		// Load dungeon navmesh manifest
+		fetch(imgHost+'navmesh/d/manifest.json')
+			.then(function(r){ return r.ok ? r.json() : {}; })
+			.then(function(manifest){
+				for(var regionKey in manifest){
+					var floors = manifest[regionKey];
+					for(var i = 0; i < floors.length; i++){
+						var info = floors[i];
+						// Convert game-world coords to Leaflet lat/lng
+						// Dungeon: lng = 128 + x/1920, lat = 127 + z/1920
+						var southWest = L.latLng(127 + info.minZ / 1920, 128 + info.minX / 1920);
+						var northEast = L.latLng(127 + info.maxZ / 1920, 128 + info.maxX / 1920);
+						var bounds = L.latLngBounds(southWest, northEast);
+						var overlay = L.imageOverlay(imgHost+'navmesh/d/'+info.file, bounds, {
+							opacity: 0.7,
+							interactive: false
+						});
+						// Key: regionKey + '_' + floor to handle multi-floor dungeons
+						var layerKey = regionKey + '_' + info.floor;
+						navmeshDungeonLayers[layerKey] = overlay;
+					}
+				}
+			})
+			.catch(function(e){ /* manifest not available, dungeon navmesh disabled */ });
+	};
+	// Get the navmesh layer for the current map layer
+	var getNavmeshLayerForCurrent = function(){
+		if(mapLayer == mappingLayers[''])
+			return navmeshWorldLayer;
+		// For dungeons, find the matching navmesh overlay
+		var region = mapLayer.options.region;
+		if(region){
+			// Determine floor index from posZ
+			var baseLayer = mappingLayers[''+region];
+			var floorIdx = 0;
+			if(baseLayer && baseLayer.options.overlap && mapLayer != baseLayer){
+				for(var i = 0; i < baseLayer.options.overlap.length; i++){
+					if(baseLayer.options.overlap[i] == mapLayer){
+						floorIdx = i + 1;
+						break;
+					}
+				}
+			}
+			var layerKey = region + '_' + floorIdx;
+			if(navmeshDungeonLayers[layerKey])
+				return navmeshDungeonLayers[layerKey];
+			// Fallback: try floor 0
+			if(navmeshDungeonLayers[region + '_0'])
+				return navmeshDungeonLayers[region + '_0'];
+		}
+		return null;
+	};
+	// Update navmesh overlay visibility
+	var updateNavmeshOverlay = function(){
+		// Remove current navmesh layer
+		if(navmeshLayer && map.hasLayer(navmeshLayer)){
+			map.removeLayer(navmeshLayer);
+			navmeshLayer = null;
+		}
+		if(!navmeshVisible) return;
+		// Add appropriate navmesh layer
+		var nmLayer = getNavmeshLayerForCurrent();
+		if(nmLayer){
+			navmeshLayer = nmLayer;
+			map.addLayer(navmeshLayer);
+		}
 	};
 	// initialize UI controls
 	var initControls = function(){
@@ -247,6 +339,40 @@ var xSROMap = function(){
 				}
 			}]
 		}).addTo(map);
+		// navmesh toggle button
+		var navmeshBtn = L.easyButton({
+			position: 'topright',
+			id: 'navmesh-toggle',
+			states:[{
+				icon: 'fas fa-layer-group',
+				title: 'Show NavMesh',
+				onClick: function(){
+					var bar = navmeshBtn.button.parentNode;
+					if(!navmeshVisible){
+						navmeshVisible = true;
+						updateNavmeshOverlay();
+						L.DomUtil.addClass(bar, 'navmesh-active');
+					} else {
+						navmeshVisible = false;
+						updateNavmeshOverlay();
+						L.DomUtil.removeClass(bar, 'navmesh-active');
+					}
+				}
+			}]
+		}).addTo(map);
+		// actions container (appears when active)
+		var nmBar = navmeshBtn.button.parentNode;
+		nmBar.style.position = 'relative';
+		var nmActions = L.DomUtil.create('div', 'navmesh-actions', nmBar);
+		var nmHideBtn = L.DomUtil.create('a', 'navmesh-action', nmActions);
+		nmHideBtn.textContent = 'Hide NavMesh';
+		nmHideBtn.href = '#';
+		L.DomEvent.on(nmHideBtn, 'click', function(e){
+			L.DomEvent.stop(e);
+			navmeshVisible = false;
+			updateNavmeshOverlay();
+			L.DomUtil.removeClass(nmBar, 'navmesh-active');
+		});
 	};
 	var initEvents = function(){
 		// show SRO coordinates on click
@@ -317,6 +443,9 @@ var xSROMap = function(){
 			// Set the new layer
 			mapLayer = tileLayer;
 			map.addLayer(mapLayer);
+
+			// re-add navmesh overlay if enabled
+			updateNavmeshOverlay();
 
 			// init highlight
 			lastMarkerSelected = null;
