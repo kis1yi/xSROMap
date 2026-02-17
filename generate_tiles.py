@@ -58,21 +58,22 @@ def generate_lower_zooms(tiles_by_zoom, zoom_dir_fn, tile_path_fn):
             break
 
         # Determine parent tile coordinates at the current level
+        # Y in files is inverted (tile.y = -tile.y), so parent_y = -(-y // 2)
         parent_coords = set()
         for (x, y) in parent_tiles:
-            parent_coords.add((x // 2, y // 2))
+            parent_coords.add((x // 2, -(-y // 2)))
 
         current_tiles = {}
         for (px, py) in parent_coords:
             merged = Image.new("RGB", (TILE_SIZE * 2, TILE_SIZE * 2))
             has_any = False
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                child = parent_tiles.get((2 * px + dx, 2 * py + dy))
-                if child:
-                    # Y in files increases upward (tile.y = -tile.y),
-                    # but in pixels it increases downward, so we invert dy
-                    merged.paste(child, (dx * TILE_SIZE, (1 - dy) * TILE_SIZE))
-                    has_any = True
+            # Children of parent py: y=2py (north/top) and y=2py-1 (south/bottom)
+            for dx in (0, 1):
+                for child_y, img_y in ((2 * py, 0), (2 * py - 1, TILE_SIZE)):
+                    child = parent_tiles.get((2 * px + dx, child_y))
+                    if child:
+                        merged.paste(child, (dx * TILE_SIZE, img_y))
+                        has_any = True
 
             if has_any:
                 resized = merged.resize((TILE_SIZE, TILE_SIZE), Image.LANCZOS)
@@ -96,17 +97,17 @@ def generate_higher_zoom(tiles_z8, tile_path_fn):
     count = 0
     for (x, y), img in tiles_z8.items():
         scaled = img.resize((TILE_SIZE * 2, TILE_SIZE * 2), Image.LANCZOS)
-        for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-            crop = scaled.crop((
-                dx * TILE_SIZE, dy * TILE_SIZE,
-                (dx + 1) * TILE_SIZE, (dy + 1) * TILE_SIZE
-            ))
-            # Y in files increases upward, but in pixels downward,
-            # so the top of the image (dy=0) maps to the higher Y
-            cx, cy = 2 * x + dx, 2 * y + (1 - dy)
-            path = tile_path_fn(MAX_ZOOM, cx, cy)
-            save_tile(crop, path)
-            count += 1
+        # Top half (img_y=0) → child y=2y (north)
+        # Bottom half (img_y=1) → child y=2y-1 (south)
+        for dx in (0, 1):
+            for img_y, child_y in ((0, 2 * y), (1, 2 * y - 1)):
+                crop = scaled.crop((
+                    dx * TILE_SIZE, img_y * TILE_SIZE,
+                    (dx + 1) * TILE_SIZE, (img_y + 1) * TILE_SIZE
+                ))
+                path = tile_path_fn(MAX_ZOOM, 2 * x + dx, child_y)
+                save_tile(crop, path)
+                count += 1
 
     print(f"  Level {MAX_ZOOM}: {count} tiles")
 
