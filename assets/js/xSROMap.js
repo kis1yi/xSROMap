@@ -339,40 +339,34 @@ var xSROMap = function(){
 				}
 			}]
 		}).addTo(map);
-		// navmesh toggle button
-		var navmeshBtn = L.easyButton({
-			position: 'topright',
-			id: 'navmesh-toggle',
-			states:[{
-				icon: 'fas fa-layer-group',
-				title: 'Show NavMesh',
-				onClick: function(){
-					var bar = navmeshBtn.button.parentNode;
-					if(!navmeshVisible){
-						navmeshVisible = true;
-						updateNavmeshOverlay();
-						L.DomUtil.addClass(bar, 'navmesh-active');
-					} else {
-						navmeshVisible = false;
-						updateNavmeshOverlay();
-						L.DomUtil.removeClass(bar, 'navmesh-active');
-					}
+		// navmesh toggle button (uses Geoman toolbar structure for consistent action positioning)
+		var nmControl = L.control({position: 'topright'});
+		nmControl.onAdd = function(){
+			var container = L.DomUtil.create('div', 'leaflet-pm-toolbar leaflet-bar');
+			var btnContainer = L.DomUtil.create('div', 'button-container', container);
+			var btn = L.DomUtil.create('a', 'leaflet-buttons-control-button navmesh-btn', btnContainer);
+			btn.href = '#';
+			btn.title = 'Show NavMesh';
+			btn.innerHTML = '<span class="fas fa-layer-group"></span>';
+			var actionsDiv = L.DomUtil.create('div', 'leaflet-pm-actions-container', btnContainer);
+			var hideBtn = L.DomUtil.create('a', 'leaflet-pm-action', actionsDiv);
+			hideBtn.href = '#';
+			hideBtn.textContent = 'Hide NavMesh';
+			var toggle = function(on){
+				navmeshVisible = on;
+				updateNavmeshOverlay();
+				if(on){
+					L.DomUtil.addClass(btnContainer, 'active');
+				} else {
+					L.DomUtil.removeClass(btnContainer, 'active');
 				}
-			}]
-		}).addTo(map);
-		// actions container (appears when active)
-		var nmBar = navmeshBtn.button.parentNode;
-		nmBar.style.position = 'relative';
-		var nmActions = L.DomUtil.create('div', 'navmesh-actions', nmBar);
-		var nmHideBtn = L.DomUtil.create('a', 'navmesh-action', nmActions);
-		nmHideBtn.textContent = 'Hide NavMesh';
-		nmHideBtn.href = '#';
-		L.DomEvent.on(nmHideBtn, 'click', function(e){
-			L.DomEvent.stop(e);
-			navmeshVisible = false;
-			updateNavmeshOverlay();
-			L.DomUtil.removeClass(nmBar, 'navmesh-active');
-		});
+			};
+			L.DomEvent.on(btn, 'click', function(e){ L.DomEvent.stop(e); toggle(!navmeshVisible); });
+			L.DomEvent.on(hideBtn, 'click', function(e){ L.DomEvent.stop(e); toggle(false); });
+			L.DomEvent.disableClickPropagation(container);
+			return container;
+		};
+		nmControl.addTo(map);
 	};
 	var initEvents = function(){
 		// show SRO coordinates on click

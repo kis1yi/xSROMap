@@ -498,6 +498,17 @@ body {
 	right:0;
 }
 /* NavMesh toggle button */
+.leaflet-pm-toolbar .navmesh-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	font-size: 14px;
+	color: #5b5b5b;
+	text-decoration: none;
+}
 #navmesh-toggle { border-radius: 0 !important; }
 .navmesh-active #navmesh-toggle { background-color: #d0d0d0; }
 .navmesh-actions {
